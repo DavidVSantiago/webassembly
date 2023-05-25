@@ -10,12 +10,16 @@
 <body>
     <h1>Olá mundo!</h1>
     <div>
-        Este é um texto webassembly
+        Este é um texto webassembly<br>
+        Você possui <span id="idade"></span> anos.
     </div>
     <script>
-        fetchAndInstantiate('Olá webassembly').then(function(instance){
-            
-        })
+        // invoca a função que carrega o módulo webassembly
+        fetchAndInstantiate('module.wasm').then(function(instance){
+           var idade = instance.exports.idade(2023,1988);
+           var idadeTag = document.getElementById('idade');
+           idadeTag.innerText=idade;
+        });
     </script>
     
 </body>

@@ -1,0 +1,9 @@
+// invoca a API webassembly e recupera os bites do modulo binário "module.wasm"
+const wasmInstance = new WebAssembly.Instance(module, {});
+// extrai a função "idade", que foi exportada dentro do módulo compilado "module.wasm"
+const {idade} = wasmInstance.exports;
+// chama a função "idade" dentro de um "for"
+for (let i = 0; i < 10; i++) {
+  console.log(idade(i, i));
+
+}

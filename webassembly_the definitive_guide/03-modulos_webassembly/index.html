@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="wa.js"></script>
+</head>
+<body>
+    <script>
+        var funcaoExterna={
+            imports:{ // acredito que seja a estrutura padrão para enviar funções para o webassembly
+                func_importada: function(arg){
+                    alert("Sua idade: "+arg+" anos.");
+                }
+            }
+        };
+        // invoca a função que carrega o módulo webassembly, passando a função criada aqui.
+        fetchAndInstantiate('module.wasm',funcaoExterna).then(
+            function(instance){
+                instance.exports.long_idade(2023,1988);
+            }
+        );
+    </script>
+</body>
+</html>
