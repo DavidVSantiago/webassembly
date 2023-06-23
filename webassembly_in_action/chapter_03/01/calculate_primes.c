@@ -8,7 +8,7 @@ int isPrime(int valor){
     for(int i=3;(i*i)<=valor;i+=2){ // percorre todos os valores intermediários
         if(valor%i==0) return 0; // encontrou um valor divisível
     }
-    return 1; // o valor e realmente primo
+    return 1; // o valor é realmente primo
 }
 
 // função inicial do módulo webassembly
@@ -18,7 +18,7 @@ int main(int argc, char const *argv[]){
     printf("Primos entre os valores %d e %d:\n",start,end);
     for(int i=start;i <=end;i+=2){
         if(isPrime(i)){
-            printf("%d",i);
+            printf("%d-",i);
         }
     }
     printf("\n");

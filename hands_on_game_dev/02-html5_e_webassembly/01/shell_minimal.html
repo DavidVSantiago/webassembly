@@ -8,8 +8,7 @@
      
       /* the canvas *must not* have any border or padding, or mouse coords will be wrong */
       canvas.emscripten { border: 0px none; background-color: black; }
-
-    
+      .emscripten { border: 0px none; background-color: #ddd; }
       @-webkit-keyframes rotation {
         from {-webkit-transform: rotate(0deg);}
         to {-webkit-transform: rotate(360deg);}
@@ -44,19 +43,19 @@
 
       /*Este objeto Module é a parte essencial! É o "códico cola" que o js usa para interagir com o webassembly*/
       var Module = {
-        preRun: [
+        preRun: [ // matriz de funções que é executada ANTES do módulo ser carregado.
           function(){console.log("Antes do módulo 1!");},
           function(){console.log("Antes do módulo 2!");}
-        ], // matriz de funções que é executada ANTES do módulo ser carregado.
-        postRun: [
+        ],
+        postRun: [ // matriz de funções que é executada APÓS do módulo ser carregado.
           function(){console.log("Após o módulo 1!");},
           function(){console.log("Após o módulo 2!");}
-        ], // matriz de funções que é executada APÓS do módulo ser carregado.
+        ],
 
         /* Usada para imprimir as saídas da função printf() em C */
         print: (function() {
-          var element = document.getElementById('output');
-          if (element) element.value = ''; // clear browser cache
+          var output = document.getElementById('output');
+          if (output) output.value = ''; // limpa o textarea
           return function(text) {
             if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
             // These replacements are necessary if you render to raw HTML
@@ -65,9 +64,9 @@
             //text = text.replace(/>/g, "&gt;");
             //text = text.replace('\n', '<br>', 'g');
             console.log(text);
-            if (element) {
-              element.value += text + "\n";
-              element.scrollTop = element.scrollHeight; // focus on bottom
+            if (output) {
+              output.value += text + "\n";
+              output.scrollTop = output.scrollHeight; // focus on bottom
             }
           };
         })(),
@@ -102,6 +101,6 @@
         };
       };
     </script>
-    {{{ SCRIPT }}} <!-- Informa ao emscripte para colocar o link para o código cola aqui -->
+    {{{ SCRIPT }}} <!-- Informa ao emscripten para colocar o link para o código cola aqui -->
   </body>
 </html>
