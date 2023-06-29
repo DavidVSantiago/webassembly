@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas</title>
+    <link rel="stylesheet" href="canvas.css">
+</head>
+<body>
+    <canvas id="canvas" width="800" height="600" oncontextmenu="event.preventDefault"></canvas>
+    <textarea class="em_textarea" id="output" rows="8"></textarea>
+    <img src="spaceship.png" id="spaceship">
+
+    <script type='text/javascript'>
+        var img = null;
+        var canvas = null;
+        var context = null;
+
+        function shipPosition(shipX, shipY){
+            if(img == null){
+                return;
+            }
+            context.fillStyle='black'; // muda  o pincel para preto
+            context.fillRect(0,0,800,600); // desenha um fundo preto na tela
+            context.save();
+            context.translate(shipX, shipY);
+            context.drawImage(img, 0, 0, img.width, img.height); // desenha a nave na tela
+            context.restore();
+        }
+        function ModuleLoaded(){
+            img = document.getElementById('spaceship');
+            canvas = document.getElementById('canvas');
+            context = canvas.getContext('2d');
+        }
+
+        var Module={
+            preRun: [],
+            postRun: [ModuleLoaded],
+            print: ( () => { // associa a função "printf" do C com o "console.log" e o "textarea"
+                var element = document.getElementById('output');
+                if (element) element.value = ''; // clear browser cache
+                return function (text) { // a função que recebe o texto do "printf"
+                    if (arguments.length > 1)
+                        text = Array.prototype.slice.call(arguments).join(' ');
+                    // uncomment block below if you want to write to an html element
+                    /*
+                    text = text.replace(/&/g, "&amp;");
+                    text = text.replace(/</g, "&lt;");
+                    text = text.replace(/>/g, "&gt;");
+                    text = text.replace('\n', '<br>', 'g');
+                    */
+                    console.log(text);
+                    if (element) {
+                        element.value += text + "\n";
+                        element.scrollTop = element.scrollHeight; // focus on bottom
+                    }
+                };
+            })(),
+            printErr: (text) => { // executa quando acontece erro de carregamento
+                if (arguments.length > 1) text = 
+                    Array.prototype.slice.call(arguments).join(' ');
+                console.error(text);
+            },
+            canvas: (() => {
+                var canvas = document.getElementById('canvas');
+                canvas.addEventListener("webglcontextlost",(e) =>{
+                    alert('WebGL context lost. You will need to reload the page.'); e.preventDefault();
+                }, false);
+                return canvas;
+            })(), 
+            setStatus: (text) => {
+                if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
+                if (text === Module.setStatus.last.text) return;
+                var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+                var now = Date.now();
+
+                // if this is a progress update, skip it if too soon
+                if (m && now - Module.setStatus.last.time < 30) return; 
+                Module.setStatus.last.time = now;
+                Module.setStatus.last.text = text;
+                if (m) {
+                    text = m[1]; 
+                }
+                console.log("status: "+text);
+            },
+            totalDependencies: 0,
+            monitorRunDependencies: (left) => {
+                this.totalDependencies = Math.max(this.totalDependencies, left);
+                Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
+            }
+        };
+        // determina o que o javascript fará caso ocorra algum erro do navegador
+        window.onerror = () => {
+            Module.setStatus('Exception thrown, see JavaScript console');
+            Module.setStatus = (text) => {
+                if (text) console.error('[post-exception status] ' + text);
+            };
+        };
+    </script>
+    <script src="canvas.js"></script>
+</body>
+</html>

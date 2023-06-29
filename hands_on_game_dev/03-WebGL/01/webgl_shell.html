@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL</title>
+    <link rel="stylesheet" href="webgl.css">
+</head>
+<body>
+    <canvas id="canvas" width="800" height="600" oncontextmenu="event.preventDefault"></canvas>
+    <textarea class="em_textarea" id="output" rows="8"></textarea>
+    <img src="spaceship.png" id="spaceship">
+
+    <script type='text/javascript'>
+        var gl = null; // contexto de renderização WebGL
+        var program = null; //Programa WebGL (compilação dos Shaders de vértice e fragmento)
+        var texture = null; // WebGL texture (a textura do arquivo de imagem)
+        var img = null; // elemento HTMLImage (usado para carregar o arquivo de imagem)
+        var canvas = null; // ref ao elemento canvas do DOM
+        var image_width=0; 
+        var image_height=0;
+        var vartex_texture_buffer = null; // buffer de vértices e texturas para envio à GPU
+        var a_textureCoord_location = null; // coordenadas UV das texturas
+        var a_positionCoord_location = null; // coordenadas dos vértices
+        var u_translate_location = null; // WebGLUniformLocation
+        var u_texture_location = null; // WebGLUniformLocation
+
+        var x2 = (2.0*(128/800.0))/2;
+        var x1=-x2;
+        var y2 = (2.0*(64/600.0))/2;
+        var y1=-y2;
+        var vertex_texture_data = new Float32Array([
+            // x,  y,     u,   v
+            x2, y2, 1.0, 1.0,
+            x1, y2, 0.0, 1.0,
+            x2, y1, 1.0, 0.0,
+            x1, y1, 0.0, 0.0,
+            x1, y2, 0.0, 1.0,
+            x2, y1, 1.0, 0.0
+        ]);
+
+        const FLOAT32_BYTE_SIZE = 4; // size of a 32-bit float
+        const STRIDE = FLOAT32_BYTE_SIZE * 4; // there are 4 elements for every vertex. x, y, u, v
+        const XY_OFFSET = FLOAT32_BYTE_SIZE * 0;
+        const UV_OFFSET = FLOAT32_BYTE_SIZE * 2;
+
+        var vertex_shader_code = `
+            precision mediump float;
+            attribute vec4 a_position;
+            attribute vec2 a_texcoord;
+            varying vec2 v_texcoord;
+            uniform vec4 u_translate;
+
+            void main() {
+                gl_Position = u_translate + a_position;
+                v_texcoord = a_texcoord;
+            }
+        `;
+
+        var fragment_shader_code = `
+            precision mediump float;
+            varying vec2 v_texcoord;
+            uniform sampler2D u_texture;
+
+            void main() {
+                gl_FragColor = texture2D(u_texture, v_texcoord);
+            }
+        `;
+
+        function ModuleLoaded(){
+            canvas = document.getElementById('canvas'); // obtem a referência do elemento canvas
+            // carrega o contexto webgl do objeto canvas
+            gl = canvas.getContext('webgl',{alpha:false}) || canvas.getContext('experimental-webgl',{alpha:fase});
+            if(!gl){ // verifica se o contexto webGL foi carregado corretamente
+                console.log("Erro ao carregar o contexto webGL - Navegador não possui suporte");
+                return;
+            }
+
+            // ativam a tecnica de mistura alpha (níveis de tranparência)
+            gl.blendFunc( gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA );
+            gl.enable( gl.BLEND );
+
+            var vertex_shader = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource( vertex_shader, vertex_shader_code );
+            gl.compileShader( vertex_shader );
+
+            if( !gl.getShaderParameter(vertex_shader, gl.COMPILE_STATUS) ) {
+                console.log('Failed to compile vertex shader' + 
+                            gl.getShaderInfoLog(vertex_shader));
+                gl.deleteShader(vertex_shader);
+                return;
+            }
+
+            var fragment_shader = gl.createShader(gl.FRAGMENT_SHADER);
+            gl.shaderSource( fragment_shader, fragment_shader_code );
+            gl.compileShader( fragment_shader );
+
+            if( !gl.getShaderParameter(fragment_shader, gl.COMPILE_STATUS) ) {
+                console.log('Failed to compile fragment shader' + 
+                            gl.getShaderInfoLog(fragment_shader));
+                gl.deleteShader(fragment_shader);
+                return;
+            }
+
+            program = gl.createProgram();
+
+            gl.attachShader(program, vertex_shader);
+            gl.attachShader(program, fragment_shader);
+            gl.linkProgram(program);
+
+            if( !gl.getProgramParameter(program, gl.LINK_STATUS) ) {
+                console.log('Failed to link program');
+                gl.deleteProgram(program);
+                return;
+            }
+
+            gl.useProgram(program);
+
+            u_texture_location = gl.getUniformLocation(program, "u_texture");
+            u_translate_location = gl.getUniformLocation(program, 
+            "u_translate");
+
+            a_position_location = gl.getAttribLocation(program, "a_position");
+            a_texcoord_location = gl.getAttribLocation(program, "a_texcoord");
+
+            vertex_texture_buffer = gl.createBuffer();
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertex_texture_buffer);
+            gl.bufferData(gl.ARRAY_BUFFER, vertex_texture_data, 
+            gl.STATIC_DRAW);
+
+            gl.enableVertexAttribArray(a_position_location);
+            gl.vertexAttribPointer(a_position_location, 2, gl.FLOAT, false, 
+            STRIDE, XY_OFFSET);
+
+            gl.enableVertexAttribArray(a_texcoord_location);
+            gl.vertexAttribPointer(a_texcoord_location, 2, gl.FLOAT, false, 
+            STRIDE, UV_OFFSET);
+
+            texture = gl.createTexture();
+
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+
+            img = new Image();
+            img.addEventListener('load', function() {
+                image_width = img.width;
+                image_height = img.height;
+
+                gl.bindTexture(gl.TEXTURE_2D, texture);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,
+                gl.UNSIGNED_BYTE, img );
+            });
+            img.src = "spaceship.png";
+
+            gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+        }
+
+        function ShipPosition( ship_x, ship_y ) {
+            if( image_width == 0 ) {
+                return;
+            }
+
+            gl.uniform4fv(u_translate_location, [ship_x, ship_y, 0.0, 0.0]);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+        }
+
+        var Module={
+            preRun: [],
+            postRun: [ModuleLoaded],
+            print: ( () => { // associa a função "printf" do C com o "console.log" e o "textarea"
+                var element = document.getElementById('output');
+                if (element) element.value = ''; // clear browser cache
+                return function (text) { // a função que recebe o texto do "printf"
+                    if (arguments.length > 1)
+                        text = Array.prototype.slice.call(arguments).join(' ');
+                    // uncomment block below if you want to write to an html element
+                    /*
+                    text = text.replace(/&/g, "&amp;");
+                    text = text.replace(/</g, "&lt;");
+                    text = text.replace(/>/g, "&gt;");
+                    text = text.replace('\n', '<br>', 'g');
+                    */
+                    console.log(text);
+                    if (element) {
+                        element.value += text + "\n";
+                        element.scrollTop = element.scrollHeight; // focus on bottom
+                    }
+                };
+            })(),
+            printErr: (text) => { // executa quando acontece erro de carregamento
+                if (arguments.length > 1) text = 
+                    Array.prototype.slice.call(arguments).join(' ');
+                console.error(text);
+            },
+            canvas: (() => {
+                var canvas = document.getElementById('canvas');
+                canvas.addEventListener("webglcontextlost",(e) =>{
+                    alert('WebGL context lost. You will need to reload the page.'); e.preventDefault();
+                }, false);
+                return canvas;
+            })(), 
+            setStatus: (text) => {
+                if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
+                if (text === Module.setStatus.last.text) return;
+                var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+                var now = Date.now();
+
+                // if this is a progress update, skip it if too soon
+                if (m && now - Module.setStatus.last.time < 30) return; 
+                Module.setStatus.last.time = now;
+                Module.setStatus.last.text = text;
+                if (m) {
+                    text = m[1]; 
+                }
+                console.log("status: "+text);
+            },
+            totalDependencies: 0,
+            monitorRunDependencies: (left) => {
+                this.totalDependencies = Math.max(this.totalDependencies, left);
+                Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
+            }
+        };
+        // determina o que o javascript fará caso ocorra algum erro do navegador
+        window.onerror = () => {
+            Module.setStatus('Exception thrown, see JavaScript console');
+            Module.setStatus = (text) => {
+                if (text) console.error('[post-exception status] ' + text);
+            };
+        };
+    </script>
+    <script src="webgl.js"></script>
+</body>
+</html>
